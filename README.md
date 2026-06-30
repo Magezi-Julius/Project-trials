@@ -153,9 +153,17 @@ gcf-doc-qa/
 
 ### Backend
 - `GITHUB_TOKEN` - Automatically available in GitHub Codespaces. Used for GitHub Models API authentication.
+- `MAX_CONTENT_LENGTH_MB` - Optional maximum upload size in megabytes for PDF files. Defaults to `500`.
+  - This can also be stored in `backend/.env` as `MAX_CONTENT_LENGTH_MB=500`.
 
 ### Frontend
 - `REACT_APP_API_URL` - Backend API base URL (defaults to `http://localhost:5001`)
+- `REACT_APP_MAX_UPLOAD_MB` - Optional frontend max upload size in megabytes for additional validation. Defaults to `500`.
+  - This can also be stored in `frontend/.env` as `REACT_APP_MAX_UPLOAD_MB=500`.
+
+## Large / scanned PDFs
+- The app can support large searchable PDFs up to the configured upload cap.
+- Image-only or scanned PDFs are not automatically OCRed. If the document has no selectable text, upload will fail with a descriptive error.
 
 ## Authentication
 

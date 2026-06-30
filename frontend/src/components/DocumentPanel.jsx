@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import './DocumentPanel.css';
 
+const MAX_UPLOAD_MB = parseInt(process.env.REACT_APP_MAX_UPLOAD_MB || '500', 10);
+const LARGE_UPLOAD_WARNING_MB = 20;
+
 function DocumentPanel({ selectedDocIds, onSelectChange, apiUrl }) {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [uploadWarning, setUploadWarning] = useState('');
   const [error, setError] = useState('');
   const [dragActive, setDragActive] = useState(false);
 
@@ -16,7 +21,7 @@ function DocumentPanel({ selectedDocIds, onSelectChange, apiUrl }) {
     try {
       setLoading(true);
       setError('');
-      const response = await fetch(`${apiUrl}/documents`);
+      const response = await fetch(`${apiUrl || ''}/documents`);
       if (!response.ok) throw new Error('Failed to fetch documents');
       const data = await response.json();
       setDocuments(data);
@@ -37,21 +42,56 @@ function DocumentPanel({ selectedDocIds, onSelectChange, apiUrl }) {
       return;
     }
 
+    const fileSizeMb = file.size / 1024 / 1024;
+    if (fileSizeMb > MAX_UPLOAD_MB) {
+      setError(`File is too large. Maximum allowed size is ${MAX_UPLOAD_MB} MB.`);
+      return;
+    }
+
+    if (fileSizeMb >= LARGE_UPLOAD_WARNING_MB) {
+      setUploadWarning(
+        `This file is large (${fileSizeMb.toFixed(1)} MB). Upload may take a while.`
+      );
+    } else {
+      setUploadWarning('');
+    }
+
     const formData = new FormData();
     formData.append('file', file);
 
     try {
       setUploading(true);
+      setProgress(0);
       setError('');
-      const response = await fetch(`${apiUrl}/upload`, {
-        method: 'POST',
-        body: formData
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
-      }
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${apiUrl || ''}/upload`);
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            let message = `Upload failed (${xhr.status})`;
+            try {
+              const errorData = JSON.parse(xhr.responseText);
+              message = errorData.error || message;
+            } catch {
+              if (xhr.responseText) message = xhr.responseText;
+            }
+            reject(new Error(message));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Upload failed due to network error'));
+        xhr.send(formData);
+      });
 
       await fetchDocuments();
     } catch (err) {
@@ -59,6 +99,7 @@ function DocumentPanel({ selectedDocIds, onSelectChange, apiUrl }) {
       console.error(err);
     } finally {
       setUploading(false);
+      setProgress(0);
     }
   };
 
@@ -89,7 +130,7 @@ function DocumentPanel({ selectedDocIds, onSelectChange, apiUrl }) {
 
   const handleDelete = async (docId) => {
     try {
-      const response = await fetch(`${apiUrl}/documents/${docId}`, {
+      const response = await fetch(`${apiUrl || ''}/documents/${docId}`, {
         method: 'DELETE'
       });
 
@@ -136,6 +177,17 @@ function DocumentPanel({ selectedDocIds, onSelectChange, apiUrl }) {
           </button>
         </div>
       </div>
+
+      {uploadWarning && !error && (
+        <div className="upload-warning">{uploadWarning}</div>
+      )}
+
+      {uploading && (
+        <div className="progress-bar-container">
+          <div className="progress-bar" style={{ width: `${progress}%` }} />
+          <div className="progress-label">Uploading... {progress}%</div>
+        </div>
+      )}
 
       {error && <div className="error-message">{error}</div>}
 

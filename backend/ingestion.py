@@ -23,7 +23,10 @@ def extract_text(pdf_path):
         raise ValueError(f"Failed to extract text from PDF: {str(e)}")
     
     if not pages:
-        raise ValueError("No valid text pages found in PDF")
+        raise ValueError(
+            "No valid text pages found in PDF. "
+            "This may be an image-only or scanned document, which requires OCR before upload."
+        )
     
     return pages
 

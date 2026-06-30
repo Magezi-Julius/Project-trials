@@ -192,6 +192,38 @@
   border-color: #ef5350;
 }
 
+.upload-warning {
+  padding: 12px;
+  margin: 0 12px 12px;
+  background-color: #fff8e1;
+  color: #795548;
+  border-radius: 4px;
+  font-size: 13px;
+  border-left: 4px solid #ffb300;
+}
+
+.progress-bar-container {
+  margin: 0 12px 12px;
+  background-color: #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  height: 18px;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #00897b, #26a69a);
+  transition: width 0.2s ease;
+}
+
+.progress-label {
+  margin-top: 6px;
+  margin-left: 12px;
+  font-size: 12px;
+  color: #424242;
+}
+
 @media (max-width: 768px) {
   .document-panel {
     width: 100%;

@@ -1,14 +1,47 @@
 import os
 import json
 import uuid
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 from ingestion import extract_text, chunk_pages, save_doc
 from retrieval import retrieve
 from qa import answer
 
-app = Flask(__name__)
+def load_env_file(path):
+    """Load simple KEY=VALUE pairs from a .env file if it exists."""
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                os.environ.setdefault(key.strip(), value.strip())
+    except Exception:
+        pass
+
+# If a production build of the frontend exists, serve it from Flask so the
+# app and API share the same origin (avoids Codespaces preview CORS/auth redirects).
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_env_file(os.path.join(BASE_DIR, "..", ".env"))
+FRONTEND_BUILD = os.path.join(BASE_DIR, "..", "frontend", "build")
+if os.path.exists(FRONTEND_BUILD):
+    app = Flask(__name__, static_folder=FRONTEND_BUILD, static_url_path="")
+else:
+    app = Flask(__name__)
+
+# Allow large PDF uploads. Default is 500 MB, but can be overridden with MAX_CONTENT_LENGTH_MB.
+max_upload_mb = int(os.getenv("MAX_CONTENT_LENGTH_MB", "500"))
+app.config["MAX_CONTENT_LENGTH"] = max_upload_mb * 1024 * 1024
+
+# Allow cross-origin for API consumers during development; when serving the
+# frontend from Flask this is not needed for the browser, but harmless.
 CORS(app, origins=["*"])
 
 UPLOAD_FOLDER = "uploads"
@@ -156,9 +189,28 @@ def delete_document(doc_id):
             os.remove(upload_path)
         
         return jsonify({"deleted": True}), 200
-    
     except Exception as e:
         return jsonify({"error": f"Delete failed: {str(e)}"}), 500
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_request_entity_too_large(error):
+    return jsonify({"error": "File too large. Please upload a PDF under 50 MB."}), 413
+
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    """Serve the built React app when available. If no build exists, return helpful message."""
+    # If frontend build exists, serve files; otherwise inform user.
+    if os.path.exists(FRONTEND_BUILD):
+        if path != '' and os.path.exists(os.path.join(FRONTEND_BUILD, path)):
+            return send_from_directory(FRONTEND_BUILD, path)
+        return send_from_directory(FRONTEND_BUILD, 'index.html')
+
+    return jsonify({
+        "message": "Frontend build not found. Run npm run build in the frontend/ folder or start the React dev server separately."
+    }), 200
 
 
 if __name__ == "__main__":

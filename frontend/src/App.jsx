@@ -12,23 +12,29 @@ function App() {
     }
 
     if (typeof window !== 'undefined') {
-      const origin = window.location.origin;
       const host = window.location.host;
+      const port = window.location.port;
 
+      // In Codespaces preview, the frontend may be served from the 3000 preview URL,
+      // while the backend runs on the corresponding 5001 preview URL.
       if (host.includes('-3000.app.github.dev')) {
-        return origin.replace('-3000.app.github.dev', '-5001.app.github.dev');
+        return `https://${host.replace('-3000.app.github.dev', '-5001.app.github.dev')}`;
+      }
+      if (host.includes('-3000.preview.app.github.dev')) {
+        return `https://${host.replace('-3000.preview.app.github.dev', '-5001.preview.app.github.dev')}`;
+      }
+      if (host.includes('-3000.githubpreview.dev')) {
+        return `https://${host.replace('-3000.githubpreview.dev', '-5001.githubpreview.dev')}`;
       }
 
-      if (host.includes('preview.app.github.dev') || host.includes('githubpreview.dev')) {
-        return origin.replace(/3000/g, '5001');
-      }
-
-      if (window.location.port === '3000') {
-        return origin.replace(':3000', ':5001');
+      // Use the React dev server proxy in local development.
+      if (port === '3000') {
+        return '';
       }
     }
 
-    return 'http://localhost:5001';
+    // Use relative paths by default so the frontend and API share the same origin.
+    return '';
   };
 
   const apiUrl = getApiUrl();

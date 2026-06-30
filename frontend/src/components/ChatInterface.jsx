@@ -40,7 +40,7 @@ function ChatInterface({ selectedDocIds, apiUrl }) {
     setError('');
 
     try {
-      const response = await fetch(`${apiUrl}/ask`, {
+      const response = await fetch(`${apiUrl || ''}/ask`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -52,8 +52,15 @@ function ChatInterface({ selectedDocIds, apiUrl }) {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get answer');
+        const text = await response.text();
+        let message = `Failed to get answer (${response.status})`;
+        try {
+          const errorData = JSON.parse(text);
+          message = errorData.error || message;
+        } catch {
+          if (text) message = text;
+        }
+        throw new Error(message);
       }
 
       const data = await response.json();
