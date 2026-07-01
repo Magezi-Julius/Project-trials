@@ -6,31 +6,40 @@ import './App.css';
 function App() {
   const [selectedDocIds, setSelectedDocIds] = useState([]);
 
+  const isCodespacesPreviewHost = (host) => {
+    return /-3000\.(app\.github\.dev|preview\.app\.github\.dev|githubpreview\.dev)$/.test(host);
+  };
+
+  const getCodespacesPreviewApiUrl = (host) => {
+    return `https://${host.replace('-3000.', '-5001.')}`;
+  };
+
   const getApiUrl = () => {
+    const host = typeof window !== 'undefined' ? window.location.host : '';
+    const port = typeof window !== 'undefined' ? window.location.port : '';
+    const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
+    const isPreview = host && isCodespacesPreviewHost(host);
+
     if (process.env.REACT_APP_API_URL) {
-      return process.env.REACT_APP_API_URL;
+      const explicitUrl = process.env.REACT_APP_API_URL.trim();
+      if (isPreview && explicitUrl.match(/^https?:\/\/(localhost|127\.0\.0\.1):5001/)) {
+        console.warn('Detected Codespaces preview environment with local API URL; switching to preview backend host.');
+        return getCodespacesPreviewApiUrl(host);
+      }
+
+      return explicitUrl;
     }
 
-    if (typeof window !== 'undefined') {
-      const host = window.location.host;
-      const port = window.location.port;
+    if (isPreview) {
+      const apiUrl = getCodespacesPreviewApiUrl(host);
+      console.info('Detected Codespaces preview, using backend URL:', apiUrl);
+      return apiUrl;
+    }
 
-      // In Codespaces preview, the frontend may be served from the 3000 preview URL,
-      // while the backend runs on the corresponding 5001 preview URL.
-      if (host.includes('-3000.app.github.dev')) {
-        return `https://${host.replace('-3000.app.github.dev', '-5001.app.github.dev')}`;
-      }
-      if (host.includes('-3000.preview.app.github.dev')) {
-        return `https://${host.replace('-3000.preview.app.github.dev', '-5001.preview.app.github.dev')}`;
-      }
-      if (host.includes('-3000.githubpreview.dev')) {
-        return `https://${host.replace('-3000.githubpreview.dev', '-5001.githubpreview.dev')}`;
-      }
-
-      // Use the React dev server proxy in local development.
-      if (port === '3000') {
-        return '';
-      }
+    // In Codespaces with dev server (not preview), use proxy
+    if (port === '3000' && !isPreview) {
+      console.info('Using proxy for local dev server');
+      return '';
     }
 
     // Use relative paths by default so the frontend and API share the same origin.

@@ -66,7 +66,13 @@ function DocumentPanel({ selectedDocIds, onSelectChange, apiUrl }) {
 
       await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${apiUrl || ''}/upload`);
+        const uploadUrl = `${apiUrl || ''}/upload`;
+        console.log('Upload URL:', uploadUrl);
+        console.log('API URL:', apiUrl);
+        xhr.open('POST', uploadUrl);
+        
+        // Enable credentials for cross-origin requests (needed for Codespaces preview)
+        xhr.withCredentials = true;
 
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
@@ -89,7 +95,16 @@ function DocumentPanel({ selectedDocIds, onSelectChange, apiUrl }) {
           }
         };
 
-        xhr.onerror = () => reject(new Error('Upload failed due to network error'));
+        xhr.onerror = () => {
+          console.error('XHR error - URL:', uploadUrl, 'ReadyState:', xhr.readyState, 'Status:', xhr.status);
+          reject(new Error('Upload failed due to network error'));
+        };
+        
+        xhr.ontimeout = () => {
+          console.error('XHR timeout - URL:', uploadUrl);
+          reject(new Error('Upload timed out'));
+        };
+        
         xhr.send(formData);
       });
 

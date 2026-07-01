@@ -42,7 +42,29 @@ app.config["MAX_CONTENT_LENGTH"] = max_upload_mb * 1024 * 1024
 
 # Allow cross-origin for API consumers during development; when serving the
 # frontend from Flask this is not needed for the browser, but harmless.
-CORS(app, origins=["*"])
+CORS(app, 
+     origins=["*"],
+     supports_credentials=True,
+     allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+     methods=['GET', 'POST', 'OPTIONS', 'DELETE', 'PUT'],
+     max_age=3600)
+
+# Add explicit preflight handling for all routes
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        response = app.make_default_options_response()
+        # Get the Origin header from the request
+        origin = request.headers.get('Origin')
+        if origin:
+            response.headers['Access-Control-Allow-Origin'] = origin
+        else:
+            response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization,X-Requested-With'
+        response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS,DELETE,PUT'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Max-Age'] = '3600'
+        return response
 
 UPLOAD_FOLDER = "uploads"
 STORE_FOLDER = "store"

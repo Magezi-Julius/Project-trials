@@ -4,3 +4,6 @@ openai
 pypdf2
 numpy
 scikit-learn
+pytesseract
+PyMuPDF
+Pillow

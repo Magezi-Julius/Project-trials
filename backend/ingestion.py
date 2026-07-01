@@ -1,3 +1,4 @@
+import io
 import os
 import json
 import re
@@ -6,7 +7,8 @@ from PyPDF2 import PdfReader
 
 def extract_text(pdf_path):
     """
-    Extract text from PDF page by page using pypdf2.
+    Extract text from PDF page by page using PyPDF2.
+    If no text is found, fall back to OCR using Tesseract.
     Returns list of {page, text} dicts, skipping pages with fewer than 50 characters.
     """
     pages = []
@@ -20,14 +22,56 @@ def extract_text(pdf_path):
                     "text": text.strip()
                 })
     except Exception as e:
-        raise ValueError(f"Failed to extract text from PDF: {str(e)}")
+        print(f"PDF text extraction failed, falling back to OCR: {e}")
+        return extract_text_with_ocr(pdf_path)
     
+    if pages:
+        return pages
+
+    return extract_text_with_ocr(pdf_path)
+
+
+def extract_text_with_ocr(pdf_path):
+    """
+    Render scanned PDF pages to images and run OCR on each page.
+    """
+    try:
+        import fitz
+        from PIL import Image
+        import pytesseract
+    except ImportError:
+        raise ValueError(
+            "OCR support is unavailable. Install pytesseract, Pillow, and PyMuPDF, "
+            "and ensure Tesseract is installed on the system."
+        )
+
+    try:
+        doc = fitz.open(pdf_path)
+    except Exception as e:
+        raise ValueError(f"Failed to open PDF for OCR: {str(e)}")
+
+    pages = []
+    for page_num, page in enumerate(doc):
+        try:
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+            image = Image.open(io.BytesIO(pix.tobytes("png")))
+            text = pytesseract.image_to_string(image, lang="eng")
+            if text and len(text.strip()) >= 50:
+                pages.append({
+                    "page": page_num + 1,
+                    "text": text.strip()
+                })
+        except Exception as e:
+            print(f"OCR failed on page {page_num + 1}: {e}")
+            continue
+
     if not pages:
         raise ValueError(
             "No valid text pages found in PDF. "
-            "This may be an image-only or scanned document, which requires OCR before upload."
+            "This may be an image-only or scanned document, and OCR did not detect readable text. "
+            "Install Tesseract and try again, or use a higher-resolution scan."
         )
-    
+
     return pages
 
 
